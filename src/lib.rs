@@ -7,14 +7,15 @@ use crate::character::{BehaviorAutomaton, CharacterBundle, Name};
 use crate::game_state::{GameState, GameplayState, MenuState};
 use crate::room::{Room, RoomCharacterStorage};
 use crate::train::{Train, ROOMS_COUNT};
+use bevy::audio::{PlaybackMode, Volume};
 use bevy::window::WindowResolution;
 use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
     prelude::*,
     // window::WindowResolution,
     render::view::visibility::RenderLayers,
-    text::{BreakLineOn, Text2dBounds},
     sprite::Anchor,
+    text::{BreakLineOn, Text2dBounds},
 };
 use std::cmp::min;
 use std::fs;
@@ -35,6 +36,9 @@ pub struct CameraPosition(pub Vec3);
 
 #[derive(Resource, Default)]
 pub struct Event(Option<String>);
+
+#[derive(Component)]
+struct Music;
 
 #[derive(Resource, Default)]
 pub struct Dialogue {
@@ -60,14 +64,19 @@ pub fn run() {
         })
         .insert_resource(Event::default())
         .insert_resource(Dialogue::default())
-        .add_startup_system(setup)
-        .add_system(handle_input)
-        .add_system(dispatch_event)
-        .add_system(move_characters)
-        .add_system(animate_sprites)
-        .add_system(animate_background)
-        .add_system(interpolate_transforms)
-        .add_system(display_dialogue)
+        .add_systems(Startup, setup)
+        .add_systems(
+            Update,
+            (
+                handle_input,
+                dispatch_event,
+                move_characters,
+                animate_sprites,
+                animate_background,
+                interpolate_transforms,
+                display_dialogue,
+            ),
+        )
         .run()
 }
 
@@ -78,7 +87,7 @@ fn setup(
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     asset_server: Res<AssetServer>,
     window: Query<&Window>,
-    audio: Res<Audio>,
+    // audio: Res<Audio>,
 ) {
     spawn_text_box(&mut commands, &window.get_single().unwrap(), &asset_server);
     // Spawn rooms, characters and train
@@ -222,11 +231,8 @@ fn setup(
                 rect: Some(Rect::new(0., 0., (ROOMS_COUNT as f32) * WIDTH, 1714.)),
                 ..default()
             },
-            transform: Transform::from_scale(Vec3::new(0.21, 0.21, 0.)).with_translation(Vec3::new(
-                0.0,
-                -HEIGHT * 0.14,
-                1.,
-            )),
+            transform: Transform::from_scale(Vec3::new(0.21, 0.21, 0.))
+                .with_translation(Vec3::new(0.0, -HEIGHT * 0.14, 1.)),
             ..default()
         },
         BackgroundAnimation {
@@ -245,8 +251,11 @@ fn setup(
                 rect: Some(Rect::new(0f32, 0f32, (ROOMS_COUNT as f32) * WIDTH, 1714.0)),
                 ..default()
             },
-            transform: Transform::from_scale(Vec3::new(0.7, 0.7, 0.))
-                .with_translation(Vec3::new(0.0, -HEIGHT * 1.13, 2.)),
+            transform: Transform::from_scale(Vec3::new(0.7, 0.7, 0.)).with_translation(Vec3::new(
+                0.0,
+                -HEIGHT * 1.13,
+                2.,
+            )),
             ..default()
         },
         BackgroundAnimation {
@@ -319,39 +328,56 @@ fn setup(
         RenderLayers::layer(2),
     ));
 
-    let audio_train = asset_server.load("audio/train.ogg");
-    audio.play_with_settings(
-        audio_train,
-        PlaybackSettings {
-            repeat: true,
-            volume: 0.25,
-            speed: 1.0,
+    // Audio Train
+    commands.spawn((
+        AudioBundle {
+            source: asset_server.load("audio/train.ogg"),
+            settings: PlaybackSettings {
+                // repeat: true,
+                mode: PlaybackMode::Loop,
+                volume: Volume::new_relative(0.25),
+                speed: 1.0,
+                paused: false,
+            },
         },
-    );
-
-    let audio_birds = asset_server.load("audio/birds.ogg");
-    audio.play_with_settings(
-        audio_birds,
-        PlaybackSettings {
-            repeat: true,
-            volume: 1.5,
-            speed: 1.0,
+        Music,
+    ));
+    // Audio Birds
+    commands.spawn((
+        AudioBundle {
+            source: asset_server.load("audio/birds.ogg"),
+            settings: PlaybackSettings {
+                mode: PlaybackMode::Loop,
+                volume: Volume::new_relative(1.5),
+                speed: 1.0,
+                paused: false,
+            },
         },
-    );
-
-    let audio_wind = asset_server.load("audio/wind.ogg");
-    audio.play_with_settings(
-        audio_wind,
-        PlaybackSettings {
-            repeat: true,
-            volume: 1.5,
-            speed: 1.0,
+        Music,
+    ));
+    // Audio Wind
+    commands.spawn((
+        AudioBundle {
+            source: asset_server.load("audio/wind.ogg"),
+            settings: PlaybackSettings {
+                mode: PlaybackMode::Loop,
+                volume: Volume::new_relative(1.5),
+                speed: 1.0,
+                paused: false,
+            },
         },
-    );
+        Music,
+    ));
+    // Audio Background jazzy
+    commands.spawn((
+        AudioBundle {
+            source: asset_server.load("audio/Night-on-the-Docks-Sax.ogg"),
+            settings: PlaybackSettings::LOOP,
+        },
+        Music,
+    ));
 
-    let audio_wind = asset_server.load("audio/Night-on-the-Docks-Sax.ogg");
-    audio.play_with_settings(audio_wind, PlaybackSettings::LOOP);
-
+    // Font
     let ui_font_handle = asset_server.load("fonts/DejaVuSerif.ttf");
     commands.insert_resource(UiFont(ui_font_handle));
 }
@@ -642,7 +668,7 @@ fn spawn_text_box(commands: &mut Commands, window: &Window, asset_server: &Res<A
                     text: Text {
                         sections: vec![TextSection::new("", style.clone())],
                         alignment: TextAlignment::Left,
-                        linebreak_behaviour: BreakLineOn::WordBoundary,
+                        linebreak_behavior: BreakLineOn::WordBoundary,
                     },
                     text_2d_bounds: Text2dBounds { size: box_size },
                     transform: Transform::from_translation(Vec3::Z),
@@ -656,7 +682,7 @@ fn spawn_text_box(commands: &mut Commands, window: &Window, asset_server: &Res<A
                     text: Text {
                         sections: vec![TextSection::new("", style.clone())],
                         alignment: TextAlignment::Center,
-                        linebreak_behaviour: BreakLineOn::WordBoundary,
+                        linebreak_behavior: BreakLineOn::WordBoundary,
                     },
                     text_2d_bounds: Text2dBounds { size: box_size },
                     transform: Transform::from_translation(
