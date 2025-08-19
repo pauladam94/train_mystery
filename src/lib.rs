@@ -77,7 +77,7 @@ pub fn run() {
                 display_dialogue,
             ),
         )
-        .run()
+        .run();
 }
 
 /// Sets up out assets, cameras, etc
@@ -235,12 +235,10 @@ fn setup(
 
     let rails_texture = asset_server.load("background/rails2.png");
     commands.spawn((
-        SpriteSheetBundle {
+        SpriteBundle {
             texture: rails_texture,
             sprite: Sprite {
                 rect: Some(Rect::new(0f32, 0f32, (ROOMS_COUNT as f32) * WIDTH, 1714.0)),
-                // flip_x : false,
-                // flip_y : false,
                 ..default()
             },
             transform: Transform::from_scale(Vec3::new(0.7, 0.7, 0.)).with_translation(Vec3::new(
@@ -261,22 +259,22 @@ fn setup(
     // TRAINS
     let wagon_texture = asset_server.load("wagon/wagon3.png");
     let texture_atlas_layout =
-        TextureAtlasLayout::from_grid(Vec2::new(1878f32, 713f32), 3, 1, None, None);
+        TextureAtlasLayout::from_grid(UVec2::new(1878u32, 713u32), 3, 1, None, None);
     let texture_atlas = texture_atlases.add(texture_atlas_layout);
 
     for i in 0..(ROOMS_COUNT - 1) {
         commands.spawn((
-            SpriteSheetBundle {
+            SpriteBundle {
                 texture: wagon_texture.clone(),
                 sprite: Sprite::default(),
-                atlas: TextureAtlas {
-                    index: i % 3,
-                    layout: texture_atlas.clone(),
-                },
                 transform: Transform::from_scale(Vec3::new(0.55, 0.55, 0.)).with_translation(
                     Vec3::new(OFFSET_WAGON * i as f32, -150f32, (i % 2) as f32 + 1f32),
                 ),
                 ..default()
+            },
+            TextureAtlas {
+                index: i % 3,
+                layout: texture_atlas.clone(),
             },
             Animation {
                 timer: Timer::from_seconds(0.1, TimerMode::Repeating),
@@ -287,22 +285,22 @@ fn setup(
 
     let locomotive_texture = asset_server.load("locomotive/locomotive.png");
     let texture_atlas = texture_atlases.add(TextureAtlasLayout::from_grid(
-        Vec2::new(966f32, 626f32),
+        UVec2::new(966u32, 626u32),
         3,
         1,
         None,
         None,
     ));
     commands.spawn((
-        SpriteSheetBundle {
+        SpriteBundle {
             texture: locomotive_texture,
             sprite: Sprite::default(),
-            atlas: TextureAtlas {
-                index: 0,
-                layout: texture_atlas,
-            },
             transform: Transform::from_translation(Vec3::new(OFFSET_WAGON * 6. - 110., 0., 1.)),
             ..default()
+        },
+        TextureAtlas {
+            index: 0,
+            layout: texture_atlas,
         },
         Animation {
             timer: Timer::from_seconds(0.1, TimerMode::Repeating),
@@ -650,7 +648,7 @@ fn spawn_text_box(commands: &mut Commands, window: &Window, asset_server: &Res<A
             TextBoxMarker,
             SpriteBundle {
                 sprite: Sprite {
-                    color: Color::rgba(0.1, 0.1, 0.1, 0.8),
+                    color: Color::srgba(0.1, 0.1, 0.1, 0.8),
                     custom_size: Some(box_size),
                     ..default()
                 },
