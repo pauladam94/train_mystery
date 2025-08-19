@@ -10,7 +10,7 @@ use crate::train::{Train, ROOMS_COUNT};
 use bevy::audio::{PlaybackMode, Volume};
 use bevy::window::WindowResolution;
 use bevy::{
-    core_pipeline::clear_color::ClearColorConfig,
+    // core_pipeline::clear_color::ClearColorConfig,
     prelude::*,
     // window::WindowResolution,
     render::view::visibility::RenderLayers,
@@ -84,10 +84,9 @@ pub fn run() {
 fn setup(
     mut commands: Commands,
     mut game_state: ResMut<GameState>,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+    mut texture_atlases: ResMut<Assets<TextureAtlasLayout>>,
     asset_server: Res<AssetServer>,
     window: Query<&Window>,
-    // audio: Res<Audio>,
 ) {
     spawn_text_box(&mut commands, &window.get_single().unwrap(), &asset_server);
     // Spawn rooms, characters and train
@@ -124,10 +123,7 @@ fn setup(
     ));
     commands.spawn((
         Camera2dBundle {
-            camera_2d: Camera2d {
-                clear_color: ClearColorConfig::None,
-                ..default()
-            },
+            camera_2d: Camera2d,
             camera: Camera {
                 order: 1,
                 is_active: false,
@@ -141,10 +137,7 @@ fn setup(
     ));
     commands.spawn((
         Camera2dBundle {
-            camera_2d: Camera2d {
-                clear_color: ClearColorConfig::None,
-                ..default()
-            },
+            camera_2d: Camera2d,
             camera: Camera {
                 order: 1,
                 is_active: true,
@@ -157,10 +150,7 @@ fn setup(
     ));
     commands.spawn((
         Camera2dBundle {
-            camera_2d: Camera2d {
-                clear_color: ClearColorConfig::None,
-                ..default()
-            },
+            camera_2d: Camera2d,
             camera: Camera {
                 order: 2,
                 ..default()
@@ -245,10 +235,12 @@ fn setup(
 
     let rails_texture = asset_server.load("background/rails2.png");
     commands.spawn((
-        SpriteBundle {
+        SpriteSheetBundle {
             texture: rails_texture,
             sprite: Sprite {
                 rect: Some(Rect::new(0f32, 0f32, (ROOMS_COUNT as f32) * WIDTH, 1714.0)),
+                // flip_x : false,
+                // flip_y : false,
                 ..default()
             },
             transform: Transform::from_scale(Vec3::new(0.7, 0.7, 0.)).with_translation(Vec3::new(
@@ -268,21 +260,19 @@ fn setup(
 
     // TRAINS
     let wagon_texture = asset_server.load("wagon/wagon3.png");
-    let texture_atlas = texture_atlases.add(TextureAtlas::from_grid(
-        wagon_texture,
-        // Vec2::new(945f32, 626f32),
-        Vec2::new(1878f32, 713f32),
-        3,
-        1,
-        None,
-        None,
-    ));
+    let texture_atlas_layout =
+        TextureAtlasLayout::from_grid(Vec2::new(1878f32, 713f32), 3, 1, None, None);
+    let texture_atlas = texture_atlases.add(texture_atlas_layout);
 
     for i in 0..(ROOMS_COUNT - 1) {
         commands.spawn((
             SpriteSheetBundle {
-                texture_atlas: texture_atlas.clone(),
-                sprite: TextureAtlasSprite::new(i % 3),
+                texture: wagon_texture.clone(),
+                sprite: Sprite::default(),
+                atlas: TextureAtlas {
+                    index: i % 3,
+                    layout: texture_atlas.clone(),
+                },
                 transform: Transform::from_scale(Vec3::new(0.55, 0.55, 0.)).with_translation(
                     Vec3::new(OFFSET_WAGON * i as f32, -150f32, (i % 2) as f32 + 1f32),
                 ),
@@ -296,8 +286,7 @@ fn setup(
     }
 
     let locomotive_texture = asset_server.load("locomotive/locomotive.png");
-    let texture_atlas = texture_atlases.add(TextureAtlas::from_grid(
-        locomotive_texture,
+    let texture_atlas = texture_atlases.add(TextureAtlasLayout::from_grid(
         Vec2::new(966f32, 626f32),
         3,
         1,
@@ -306,8 +295,12 @@ fn setup(
     ));
     commands.spawn((
         SpriteSheetBundle {
-            texture_atlas,
-            sprite: TextureAtlasSprite::new(0),
+            texture: locomotive_texture,
+            sprite: Sprite::default(),
+            atlas: TextureAtlas {
+                index: 0,
+                layout: texture_atlas,
+            },
             transform: Transform::from_translation(Vec3::new(OFFSET_WAGON * 6. - 110., 0., 1.)),
             ..default()
         },
@@ -333,12 +326,12 @@ fn setup(
         AudioBundle {
             source: asset_server.load("audio/train.ogg"),
             settings: PlaybackSettings {
-                // repeat: true,
                 mode: PlaybackMode::Loop,
-                volume: Volume::new_relative(0.25),
+                volume: Volume::new(0.25),
                 speed: 1.0,
                 paused: false,
                 spatial: true,
+                ..default()
             },
         },
         Music,
@@ -349,10 +342,11 @@ fn setup(
             source: asset_server.load("audio/birds.ogg"),
             settings: PlaybackSettings {
                 mode: PlaybackMode::Loop,
-                volume: Volume::new_relative(1.5),
+                volume: Volume::new(1.5),
                 speed: 1.0,
                 paused: false,
                 spatial: true,
+                ..default()
             },
         },
         Music,
@@ -363,10 +357,11 @@ fn setup(
             source: asset_server.load("audio/wind.ogg"),
             settings: PlaybackSettings {
                 mode: PlaybackMode::Loop,
-                volume: Volume::new_relative(1.5),
+                volume: Volume::new(1.5),
                 speed: 1.0,
                 paused: false,
                 spatial: true,
+                ..default()
             },
         },
         Music,
@@ -387,7 +382,7 @@ fn setup(
 
 /// Deals with player input
 fn handle_input(
-    keys: Res<Input<KeyCode>>,
+    keys: Res<ButtonInput<KeyCode>>,
     mut game_state: ResMut<GameState>,
     mut event: ResMut<Event>,
     mut dialogue: ResMut<Dialogue>,
@@ -401,7 +396,7 @@ fn handle_input(
     mut visibility: Query<&mut Visibility, With<BehaviorAutomaton>>,
 ) {
     let train = train.get_single().unwrap();
-    if keys.just_pressed(KeyCode::Left) && dialogue.text.is_empty() {
+    if keys.just_pressed(KeyCode::ArrowLeft) && dialogue.text.is_empty() {
         match game_state.as_mut() {
             GameState {
                 opened_menu: MenuState::None,
@@ -424,7 +419,7 @@ fn handle_input(
             _ => (),
         }
     }
-    if keys.just_pressed(KeyCode::Right) && dialogue.text.is_empty() {
+    if keys.just_pressed(KeyCode::ArrowRight) && dialogue.text.is_empty() {
         match game_state.as_mut() {
             GameState {
                 opened_menu: MenuState::None,
@@ -510,7 +505,7 @@ fn handle_input(
             _ => (),
         }
     }
-    if keys.just_pressed(KeyCode::Back) && dialogue.text.is_empty() {
+    if keys.just_pressed(KeyCode::Backspace) && dialogue.text.is_empty() {
         match game_state.as_mut() {
             GameState {
                 gameplay_state: GameplayState::Room { room_id, .. },
@@ -569,7 +564,7 @@ fn interpolate_transforms(mut query: Query<(&CameraPosition, &mut Transform)>) {
     }
 }
 
-fn animate_sprites(time: Res<Time>, mut query: Query<(&mut Animation, &mut TextureAtlasSprite)>) {
+fn animate_sprites(time: Res<Time>, mut query: Query<(&mut Animation, &mut TextureAtlas)>) {
     for (mut animation, mut sprite) in &mut query {
         animation.timer.tick(time.delta());
         if animation.timer.just_finished() {
@@ -670,7 +665,8 @@ fn spawn_text_box(commands: &mut Commands, window: &Window, asset_server: &Res<A
                 Text2dBundle {
                     text: Text {
                         sections: vec![TextSection::new("", style.clone())],
-                        alignment: TextAlignment::Left,
+                        justify: JustifyText::Left,
+                        // alignment: TextAlignment::Left,
                         linebreak_behavior: BreakLineOn::WordBoundary,
                     },
                     text_2d_bounds: Text2dBounds { size: box_size },
@@ -684,7 +680,7 @@ fn spawn_text_box(commands: &mut Commands, window: &Window, asset_server: &Res<A
                 Text2dBundle {
                     text: Text {
                         sections: vec![TextSection::new("", style.clone())],
-                        alignment: TextAlignment::Center,
+                        justify: JustifyText::Center,
                         linebreak_behavior: BreakLineOn::WordBoundary,
                     },
                     text_2d_bounds: Text2dBounds { size: box_size },
